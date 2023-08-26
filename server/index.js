@@ -18,13 +18,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 
 //MONGOOSE Configrations
-<<<<<<< HEAD
-
 const PORT = process.env.PORT || 9000;
-
-=======
-const PORT = process.env.PORT || 9000;
->>>>>>> b8dd24cf54289cee0c5ae745974a7ada5a011da7
 mongoose
   .connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
