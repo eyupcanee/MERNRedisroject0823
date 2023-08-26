@@ -19,6 +19,7 @@ const AdminTestSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    img: String,
     occupation: String,
     phoneNumber: String,
     role: {
