@@ -19,25 +19,29 @@ export const getTestAdminCached = async (req, res, next) => {
       next();
     }
   } catch (error) {
-    res.status(404).json({ status: "no", message: error.message });
+    next();
   }
 };
 
 export const getAllTestAdminsCached = async (req, res, next) => {
   const hashKey = "admins";
-  const allAdminsFromDB = await AdminTest.countDocuments();
-  const cacheAdminCount = await redisClient.hlen(hashKey);
+  try {
+    const allAdminsFromDB = await AdminTest.countDocuments();
+    const cacheAdminCount = await redisClient.hlen(hashKey);
 
-  if (cacheAdminCount === allAdminsFromDB) {
-    redisClient.hgetall(hashKey, (error, results) => {
-      if (error) {
-        res.status(404).json({ status: "no", message: error.message });
-      } else {
-        const data = Object.values(results).map((value) => JSON.parse(value));
-        res.status(200).json({ status: "ok", fromCache: true, data: data });
-      }
-    });
-  } else {
+    if (cacheAdminCount === allAdminsFromDB) {
+      redisClient.hgetall(hashKey, (error, results) => {
+        if (error) {
+          res.status(404).json({ status: "no", message: error.message });
+        } else {
+          const data = Object.values(results).map((value) => JSON.parse(value));
+          res.status(200).json({ status: "ok", fromCache: true, data: data });
+        }
+      });
+    } else {
+      next();
+    }
+  } catch (error) {
     next();
   }
 };
