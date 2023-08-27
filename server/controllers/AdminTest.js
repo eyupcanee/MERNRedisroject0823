@@ -148,3 +148,59 @@ export const addTestAdmin = async (req, res) => {
     });
   }
 };
+
+export const updateTestAdmin = async (req, res) => {
+  const { id, name, surname, email, password, img, phoneNumber, occupation } =
+    req.body;
+  const { token } = req.params;
+  const encryptedPassword = await bcrypt.hash(password, 8);
+
+  if (await authorizeAdmin(token)) {
+    const adminId = await getAdminId(token);
+    const admin = await AdminTest.findById(adminId);
+    await AdminTest.findByIdAndUpdate(id, {
+      name: name,
+      surname: surname,
+      email: email,
+      password: encryptedPassword,
+      img: img,
+      phoneNumber: phoneNumber,
+      occupation: occupation,
+    })
+      .then(() => {
+        npmlog.info(
+          `${name} ${surname} updated by ${admin.name} ${admin.surname}. Admin Id : ${adminId}`
+        );
+        insertAdminTestLog({
+          id: adminId,
+          logMessage: `${name} ${surname} updated by ${admin.name} ${admin.surname}. Admin Id : ${adminId}`,
+          logType: "update",
+          success: true,
+        });
+        res
+          .status(200)
+          .json({ status: "ok", message: "Admin informations have updated." });
+      })
+      .catch((error) => {
+        npmlog.warn(
+          `${name} ${surname}'s datas was tried to be updated by ${admin.name} ${admin.surname}. Admin Id: ${adminId}`
+        );
+        insertAdminTestLog({
+          id: adminId,
+          logMessage: `${name} ${surname}'s datas was tried to be updated by ${admin.name} ${admin.surname}. Admin Id: ${adminId}`,
+          logType: "update",
+          success: false,
+        });
+
+        res.status(404).json({
+          status: "no",
+          message: `An error was encountered. Error : ${error.message}`,
+        });
+      });
+  } else {
+    res.status(404).json({
+      status: "no",
+      message: "You don't have permission for this process!",
+    });
+  }
+};

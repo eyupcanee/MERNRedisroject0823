@@ -17,5 +17,8 @@ const upload = multer({ storage: storage });
 
 const router = express.Router();
 
-router.post("/addadmin", upload.single("img"), addTestAdmin);
+router.post("/addadmin/:token", upload.single("img"), addTestAdmin);
+router.post("/login", loginTestAdmin);
+router.post("/logout/:token", logoutTestAdmin);
+
 export default router;
