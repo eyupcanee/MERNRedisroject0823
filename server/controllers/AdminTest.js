@@ -8,7 +8,7 @@ import { insertAdminTestLog } from "./AdminTestLog.js";
 import { authorizeAdmin, getAdminId } from "../utils/Authorize.js";
 
 import { v2 as cloudinary } from "cloudinary";
-import redis from "redis";
+import redisClient from "../redis/RedisConfigration.js";
 
 //dotenv configration
 dotenv.config({ path: "./.env.development.local" });
@@ -21,6 +21,49 @@ cloudinary.config({
 });
 
 //redis configration
+(async () => {
+  try {
+    await redisClient.connect();
+  } catch (error) {}
+})();
+
+export const getTestAdmin = async (req, res) => {
+  const { id } = req.params;
+  await redisClient.del(id);
+  AdminTest.findById(id)
+    .then((admin) => {
+      redisClient.set(id, JSON.stringify(admin));
+      res.status(200).json({ status: "ok", fromCache: false, data: admin });
+    })
+    .catch((error) => {
+      res.status(404).json({ status: "no", message: error.message });
+    });
+};
+
+export const getAllTestAdmins = async (req, res) => {
+  try {
+    const admins = await AdminTest.find().select("-password");
+    await admins.forEach((admin) => {
+      redisClient.hsetnx(
+        "admins",
+        admin._id,
+        JSON.stringify(admin),
+        (error, result) => {
+          if (error) {
+            console.log(`Error : ${error.message}`);
+          } else if (result === 1) {
+            console.log(`Admin ${admin._id} has added succesfully.`);
+          } else {
+            console.log(`${admin._id} is already exists.`);
+          }
+        }
+      );
+    });
+    res.status(200).json({ status: "ok", data: admins });
+  } catch (error) {
+    res.status(404).json({ status: "no", message: error.message });
+  }
+};
 
 export const loginTestAdmin = async (req, res) => {
   try {

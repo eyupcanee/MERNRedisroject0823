@@ -4,7 +4,14 @@ import {
   addTestAdmin,
   loginTestAdmin,
   logoutTestAdmin,
+  getTestAdmin,
+  getAllTestAdmins,
 } from "../controllers/AdminTest.js";
+
+import {
+  getTestAdminCached,
+  getAllTestAdminsCached,
+} from "../redis/AdminTestCache.js";
 
 const storage = multer.diskStorage({
   destination: "./uploads",
@@ -20,5 +27,7 @@ const router = express.Router();
 router.post("/addadmin/:token", upload.single("img"), addTestAdmin);
 router.post("/login", loginTestAdmin);
 router.post("/logout/:token", logoutTestAdmin);
+router.get("/get/:id", getTestAdminCached, getTestAdmin);
+router.get("/get", getAllTestAdminsCached, getAllTestAdmins);
 
 export default router;
