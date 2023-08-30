@@ -59,9 +59,11 @@ export const getAllTestAdmins = async (req, res) => {
         }
       );
     });
-    res.status(200).json({ status: "ok", data: admins });
+    res.status(200).json({ status: "ok", fromCache: false, data: admins });
   } catch (error) {
-    res.status(404).json({ status: "no", message: error.message });
+    res
+      .status(404)
+      .json({ status: "no", fromCache: false, message: error.message });
   }
 };
 
@@ -73,37 +75,44 @@ export const loginTestAdmin = async (req, res) => {
     });
 
     if (!admin) {
-      res.status(404).json({ status: "no" });
-    }
-
-    if (await bcrypt.compare(password, admin.password)) {
-      const token = jwt.sign(
-        {
-          id: admin._id,
-          role: admin.role,
-        },
-        process.env.JWT_CODE
-      );
-      npmlog.info(`${admin.name} ${admin.surname} Has Logged In As An Admin`);
+      npmlog.warn(`${req.body.email} Has Tried Logging In As An Admin`);
       await insertAdminTestLog({
         id: admin._id,
-        logMessage: `${admin.name} ${admin.surname} Has Logged In As An Admin`,
+        logMessage: `${req.body.email} Has Tried Logging In As An Admin`,
         logType: "login",
         success: true,
       });
-
-      res.status(200).json({ status: "ok", token: token });
-    } else {
-      npmlog.warn(
-        `${admin.name} ${admin.surname} Has Tried Logging In As An Admin`
-      );
-      await insertAdminTestLog({
-        id: admin._id,
-        logMessage: `${admin.name} ${admin.surname} Has Tried Logging In As An Admin`,
-        logType: "login",
-        success: false,
-      });
       res.status(404).json({ status: "no" });
+    } else {
+      if (await bcrypt.compare(password, admin.password)) {
+        const token = jwt.sign(
+          {
+            id: admin._id,
+            role: admin.role,
+          },
+          process.env.JWT_CODE
+        );
+        npmlog.info(`${admin.name} ${admin.surname} Has Logged In As An Admin`);
+        await insertAdminTestLog({
+          id: admin._id,
+          logMessage: `${admin.name} ${admin.surname} Has Logged In As An Admin`,
+          logType: "login",
+          success: true,
+        });
+
+        res.status(200).json({ status: "ok", token: token });
+      } else {
+        npmlog.warn(
+          `${admin.name} ${admin.surname} Has Tried Logging In As An Admin With Wrong Password`
+        );
+        await insertAdminTestLog({
+          id: admin._id,
+          logMessage: `${admin.name} ${admin.surname} Has Tried Logging In As An Admin With Wrong Password`,
+          logType: "login",
+          success: false,
+        });
+        res.status(404).json({ status: "no" });
+      }
     }
   } catch (error) {
     res.status(404).json({ status: "no" });
@@ -134,17 +143,21 @@ export const logoutTestAdmin = async (req, res) => {
 };
 
 export const addTestAdmin = async (req, res) => {
-  const { name, surname, email, password, occupation, phoneNumber } = req.body;
+  const { name, surname, email, password, img, occupation, phoneNumber } =
+    req.body;
   const { token } = req.params;
   const encryptedPassword = await bcrypt.hash(password, 8);
-  const result = await cloudinary.uploader.upload(req.file.path);
+
+  if (!img) {
+    var result = await cloudinary.uploader.upload(req.file.path);
+  }
 
   const newTestAdmin = new AdminTest({
     name,
     surname,
     email,
     password: encryptedPassword,
-    img: result.secure_url,
+    img: `${result ? result.secure_url : img}`,
     occupation,
     phoneNumber,
   });
@@ -152,20 +165,30 @@ export const addTestAdmin = async (req, res) => {
   try {
     const adminId = await getAdminId(token);
     if (await authorizeAdmin(token)) {
-      await newTestAdmin.save().then(() => {
-        npmlog.info(
-          `New Admin Added ${newTestAdmin.name} ${newTestAdmin.surname} by ${adminId}`
-        );
+      await newTestAdmin
+        .save()
+        .then(() => {
+          npmlog.info(
+            `New Admin Added ${newTestAdmin.name} ${newTestAdmin.surname} by ${adminId}`
+          );
 
-        insertAdminTestLog({
-          id: adminId,
-          logMessage: `New Admin Added ${newTestAdmin.name} ${newTestAdmin.surname} by ${adminId}`,
-          logType: "insert",
-          success: true,
+          insertAdminTestLog({
+            id: adminId,
+            logMessage: `New Admin Added ${newTestAdmin.name} ${newTestAdmin.surname} by ${adminId}`,
+            logType: "insert",
+            success: true,
+          });
+
+          res.status(200).json({ status: "ok" });
+        })
+        .catch((error) => {
+          npmlog.warn(
+            `Admin Insertion Has Tried By ${
+              adminId ? adminId : process.env.TEST_ADMIN_ID
+            }`
+          );
+          res.status(404).json({ status: "no", message: error.message });
         });
-
-        res.status(200).json({ status: "ok" });
-      });
     } else {
       npmlog.warn(
         `Admin Insertion Has Tried By ${
