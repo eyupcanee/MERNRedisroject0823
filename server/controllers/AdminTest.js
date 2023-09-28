@@ -217,6 +217,7 @@ export const addTestAdmin = async (req, res) => {
       logType: "insert",
       success: false,
     });
+    res.status(404).json({ status: "no", message: error.message });
   }
 };
 

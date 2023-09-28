@@ -19,6 +19,6 @@ const PostTestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const PostTest = mongoose.Model("PostTest", PostTestSchema);
+const PostTest = mongoose.model("PostTest", PostTestSchema);
 
 export default PostTest;
