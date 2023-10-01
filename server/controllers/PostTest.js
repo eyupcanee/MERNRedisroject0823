@@ -147,3 +147,91 @@ export const addTestPost = async (req, res) => {
     res.status(404).json({ status: "no", message: error.message });
   }
 };
+
+export const updateTestPost = async (req, res) => {
+  const { id, title, content, author, img } = req.body;
+  const { token } = req.params;
+
+  if (!img) {
+    var result = await cloudinary.uploader.upload(req.file.path);
+  }
+
+  let processorId;
+  let redisUpdate = false;
+
+  try {
+    if (await getAdminId(token)) {
+      processorId = await getAdminId(token);
+    } else {
+      processorId = await getEditorId(token);
+    }
+
+    if ((await authorizeAdmin(token)) || (await authorizeEditor(token))) {
+      await PostTest.findByIdAndUpdate(id, {
+        title: title,
+        content: content,
+        author: author,
+        img: img,
+      }).then((newPost) => {
+        npmlog.info(`${id} || ${title} post updated by ${processorId}.`);
+        redisClient.hset("posts", id, JSON.stringify(newPost), (err, reply) => {
+          if (err) {
+            redisUpdate = false;
+          } else {
+            redisUpdate = true;
+          }
+        });
+        redisClient.set(id, JSON.stringify(newPost), (err, reply) => {
+          if (err) {
+            redisUpdate = false;
+          } else {
+            redisUpdate = true;
+          }
+        });
+        insertPostTestLog({
+          post: `${id}`,
+          processor: `${processorId}`,
+          logMessage: `${id} || ${title} post updated by ${processorId}.`,
+          logType: "update",
+          success: true,
+        });
+
+        res.status(200).json({
+          status: "ok",
+          message: "Post has updated!",
+          redisUpdate: `${redisUpdate}`,
+        });
+      });
+    } else {
+      res.status(404).json({
+        status: "no",
+        message: "You don't have permission for this process!",
+        redisUpdate: `${redisUpdate}`,
+      });
+    }
+  } catch (error) {
+    npmlog.warn(
+      `Post update was tried to be updated by ${
+        processorId ? processorId : process.env.TEST_ADMIN_ID
+      }`
+    );
+
+    insertPostTestLog({
+      post: `${id ? id : process.env.TEST_POST_ID}`,
+      processor: `${processorId ? processorId : process.env.TEST_ADMIN_ID}`,
+      logMessage: `Post update was tried to be updated by ${
+        processorId ? processorId : process.env.TEST_ADMIN_ID
+      }`,
+      logType: "update",
+      success: false,
+    });
+
+    res
+      .status(404)
+      .json({
+        status: "no",
+        message: error.message,
+        redisUpdate: `${redisUpdate}`,
+      });
+  }
+};
