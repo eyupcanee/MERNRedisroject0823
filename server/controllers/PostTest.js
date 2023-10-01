@@ -157,7 +157,8 @@ export const updateTestPost = async (req, res) => {
   }
 
   let processorId;
-  let redisUpdate = false;
+  let redisUpdateStatus;
+  let newPost;
 
   try {
     if (await getAdminId(token)) {
@@ -172,22 +173,9 @@ export const updateTestPost = async (req, res) => {
         content: content,
         author: author,
         img: img,
-      }).then((newPost) => {
+      }).then((result) => {
         npmlog.info(`${id} || ${title} post updated by ${processorId}.`);
-        redisClient.hset("posts", id, JSON.stringify(newPost), (err, reply) => {
-          if (err) {
-            redisUpdate = false;
-          } else {
-            redisUpdate = true;
-          }
-        });
-        redisClient.set(id, JSON.stringify(newPost), (err, reply) => {
-          if (err) {
-            redisUpdate = false;
-          } else {
-            redisUpdate = true;
-          }
-        });
+        newPost = result;
         insertPostTestLog({
           post: `${id}`,
           processor: `${processorId}`,
@@ -195,18 +183,30 @@ export const updateTestPost = async (req, res) => {
           logType: "update",
           success: true,
         });
+      });
+      redisClient.hset("posts", id, JSON.stringify(newPost), (err, reply) => {
+        if (err) {
+          redisUpdateStatus = false;
+        }
+        redisUpdateStatus = true;
+      });
+      redisClient.set(id, JSON.stringify(newPost), (err, reply) => {
+        if (err) {
+          redisUpdateStatus = false;
+        }
+        redisUpdateStatus = true;
+      });
 
-        res.status(200).json({
-          status: "ok",
-          message: "Post has updated!",
-          redisUpdate: `${redisUpdate}`,
-        });
+      res.status(200).json({
+        status: "ok",
+        message: "Post has updated!",
+        redisUpdate: redisUpdateStatus,
       });
     } else {
       res.status(404).json({
         status: "no",
         message: "You don't have permission for this process!",
-        redisUpdate: `${redisUpdate}`,
+        redisUpdate: redisUpdateStatus,
       });
     }
   } catch (error) {
@@ -226,12 +226,10 @@ export const updateTestPost = async (req, res) => {
       success: false,
     });
 
-    res
-      .status(404)
-      .json({
-        status: "no",
-        message: error.message,
-        redisUpdate: `${redisUpdate}`,
-      });
+    res.status(404).json({
+      status: "no",
+      message: error.message,
+      redisUpdate: redisUpdateStatus,
+    });
   }
 };
