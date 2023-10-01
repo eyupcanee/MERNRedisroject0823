@@ -6,6 +6,7 @@ import {
   logoutTestAdmin,
   getTestAdmin,
   getAllTestAdmins,
+  updateTestAdmin,
 } from "../controllers/AdminTest.js";
 
 import {
@@ -25,6 +26,7 @@ const upload = multer({ storage: storage });
 const router = express.Router();
 
 router.post("/addadmin/:token", upload.single("img"), addTestAdmin);
+router.post("/updateadmin/:token", upload.single("img"), updateTestAdmin);
 router.post("/login", loginTestAdmin);
 router.post("/logout/:token", logoutTestAdmin);
 router.get("/get/:id", getTestAdminCached, getTestAdmin);
