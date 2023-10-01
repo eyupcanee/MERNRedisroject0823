@@ -29,8 +29,8 @@ const defaultAdmin = {
 };
 
 const defaultAdminForUpdate = {
-  id: process.env.ADMIN_TEST_ID,
-  name: process.env.ADMIN_TEST_NAME,
+  id: `${process.env.ADMIN_TEST_ID}`,
+  name: `${process.env.ADMIN_TEST_NAME}+updated!`,
   surname: process.env.ADMIN_TEST_SURNAME,
   email: process.env.ADMIN_TEST_EMAIL,
   password: process.env.ADMIN_TEST_PASSWORD,
@@ -111,6 +111,23 @@ describe("Successfully Admin Tests", function () {
     expect(res).to.equal("ok");
     expect(fromCache).to.equal(true);
   });
+  it("Update admin test. Should update admin with new admin datas.", async function () {
+    let res;
+    let redisUpdate;
+
+    await axios
+      .post(
+        `${endpoint}admintest/updateadmin/${adminTestToken}`,
+        defaultAdminForUpdate
+      )
+      .then((response) => {
+        res = response.data.status;
+        redisUpdate = response.data.redisUpdate;
+      });
+
+    expect(res).to.equal("ok");
+    expect(redisUpdate).to.equal(true);
+  });
 });
 
 describe("Unsuccessfully Admin Tests", function () {
@@ -161,7 +178,6 @@ describe("Unsuccessfully Admin Tests", function () {
       .post(`${endpoint}admintest/logout/${adminWrongTestToken}`)
       .then((response) => (res = response.data.status))
       .catch((error) => (res = error.response.data.status));
-
     expect(res).to.equal("no");
   });
 });

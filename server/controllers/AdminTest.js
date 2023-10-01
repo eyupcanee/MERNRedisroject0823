@@ -231,7 +231,8 @@ export const updateTestAdmin = async (req, res) => {
     var result = await cloudinary.uploader.upload(req.file.path);
   }
 
-  let redisUpdate = false;
+  let redisUpdateStatus;
+  let newAdmin;
 
   if (await authorizeAdmin(token)) {
     const adminId = await getAdminId(token);
@@ -245,39 +246,16 @@ export const updateTestAdmin = async (req, res) => {
       phoneNumber: phoneNumber,
       occupation: occupation,
     })
-      .then((newAdmin) => {
+      .then((result) => {
         npmlog.info(
           `${name} ${surname} updated by ${admin.name} ${admin.surname}. Admin Id : ${adminId}`
         );
-        redisClient.hset(
-          "admins",
-          id,
-          JSON.stringify(newAdmin),
-          (err, reply) => {
-            if (err) {
-              redisUpdate = false;
-            } else {
-              redisUpdate = true;
-            }
-          }
-        );
-        redisClient.set(id, JSON.stringify(newAdmin), (err, reply) => {
-          if (err) {
-            redisUpdate = false;
-          } else {
-            redisUpdate = true;
-          }
-        });
+        newAdmin = result;
         insertAdminTestLog({
           id: adminId,
           logMessage: `${name} ${surname} updated by ${admin.name} ${admin.surname}. Admin Id : ${adminId}`,
           logType: "update",
           success: true,
-        });
-        res.status(200).json({
-          status: "ok",
-          message: "Admin informations have updated.",
-          redisUpdate: `${redisUpdate}`,
         });
       })
       .catch((error) => {
@@ -294,14 +272,38 @@ export const updateTestAdmin = async (req, res) => {
         res.status(404).json({
           status: "no",
           message: `An error was encountered. Error : ${error.message}`,
-          redisUpdate: `${redisUpdate}`,
+          redisUpdate: redisUpdateStatus,
         });
       });
+
+    await redisClient.hset(
+      "admins",
+      id,
+      JSON.stringify(newAdmin),
+      (err, reply) => {
+        if (err) {
+          redisUpdateStatus = false;
+        }
+        redisUpdateStatus = true;
+      }
+    );
+    await redisClient.set(id, JSON.stringify(newAdmin), (err, reply) => {
+      if (err) {
+        redisUpdateStatus = false;
+      }
+      redisUpdateStatus = true;
+    });
+
+    res.status(200).json({
+      status: "ok",
+      message: "Admin informations have updated.",
+      redisUpdate: redisUpdateStatus,
+    });
   } else {
     res.status(404).json({
       status: "no",
       message: "You don't have permission for this process!",
-      redisUpdate: `${redisUpdate}`,
+      redisUpdate: redisUpdateStatus,
     });
   }
 };
