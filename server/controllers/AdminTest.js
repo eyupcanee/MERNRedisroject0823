@@ -227,6 +227,12 @@ export const updateTestAdmin = async (req, res) => {
   const { token } = req.params;
   const encryptedPassword = await bcrypt.hash(password, 8);
 
+  if (!img) {
+    var result = await cloudinary.uploader.upload(req.file.path);
+  }
+
+  let redisUpdate = false;
+
   if (await authorizeAdmin(token)) {
     const adminId = await getAdminId(token);
     const admin = await AdminTest.findById(adminId);
@@ -239,19 +245,40 @@ export const updateTestAdmin = async (req, res) => {
       phoneNumber: phoneNumber,
       occupation: occupation,
     })
-      .then(() => {
+      .then((newAdmin) => {
         npmlog.info(
           `${name} ${surname} updated by ${admin.name} ${admin.surname}. Admin Id : ${adminId}`
         );
+        redisClient.hset(
+          "admins",
+          id,
+          JSON.stringify(newAdmin),
+          (err, reply) => {
+            if (err) {
+              redisUpdate = false;
+            } else {
+              redisUpdate = true;
+            }
+          }
+        );
+        redisClient.set(id, JSON.stringify(newAdmin), (err, reply) => {
+          if (err) {
+            redisUpdate = false;
+          } else {
+            redisUpdate = true;
+          }
+        });
         insertAdminTestLog({
           id: adminId,
           logMessage: `${name} ${surname} updated by ${admin.name} ${admin.surname}. Admin Id : ${adminId}`,
           logType: "update",
           success: true,
         });
-        res
-          .status(200)
-          .json({ status: "ok", message: "Admin informations have updated." });
+        res.status(200).json({
+          status: "ok",
+          message: "Admin informations have updated.",
+          redisUpdate: `${redisUpdate}`,
+        });
       })
       .catch((error) => {
         npmlog.warn(
@@ -267,12 +294,14 @@ export const updateTestAdmin = async (req, res) => {
         res.status(404).json({
           status: "no",
           message: `An error was encountered. Error : ${error.message}`,
+          redisUpdate: `${redisUpdate}`,
         });
       });
   } else {
     res.status(404).json({
       status: "no",
       message: "You don't have permission for this process!",
+      redisUpdate: `${redisUpdate}`,
     });
   }
 };
